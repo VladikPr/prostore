@@ -20,9 +20,9 @@ export function formatNumberWithDecimal(num: number): string {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function formatError(error: any) {
   if (error.name === "ZodError") {
-    // Handle Zod error
-    const fieldErrors = Object.keys(error.errors).map(
-      (field) => error.errors[field].message
+    // Handle Zod error - error.issues is an array
+    const fieldErrors = error.issues.map(
+      (err: { message: string }) => err.message
     );
 
     return fieldErrors.join(". ");
@@ -30,8 +30,18 @@ export function formatError(error: any) {
     error.name === "PrismaClientKnownRequestError" &&
     error.code === "P2002"
   ) {
-    // Handle Prisma error
-    const field = error.meta?.target ? error.meta.target[0] : "Field";
+    // Handle Prisma unique constraint error
+    let field = "Field";
+    if (error.meta?.target) {
+      // target can be an array of field names
+      field = Array.isArray(error.meta.target)
+        ? error.meta.target[0]
+        : error.meta.target;
+    } else if (error.meta?.modelName) {
+      // Fallback: try to extract from the error message
+      const match = error.message?.match(/fields: \(`(\w+)`\)/);
+      field = match ? match[1] : "Field";
+    }
     return `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`;
   } else {
     // Handle other errors
